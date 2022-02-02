@@ -1,0 +1,103 @@
+
+import java.io.IOException;
+
+public class Parser implements IParser {
+    private ITokenizer tokenizer;
+
+
+    @Override
+    public void open(String fileName) throws IOException, TokenizerException {
+        tokenizer = new Tokenizer();
+        tokenizer.open(fileName); // tokenoizer will open the file and compare tokkens with based on tokens it will call nodes
+        tokenizer.moveNext();
+    }
+
+    @Override
+    public INode parse() throws IOException, TokenizerException, ParserException {
+        if (tokenizer.current().token() == Token.IDENT) {// jodi IDENT hoy then onno gula compare korbe
+            return parseAssignNode(); //in line 71
+        }
+        throw new ParserException("Unexpected token: " + tokenizer.current().value());
+    }
+
+    private FactorNode parseFactorNode() throws ParserException, IOException, TokenizerException {
+        FactorNode factorNode;
+
+        if (tokenizer.current().token() == Token.INT_LIT) {
+            factorNode = new FactorNode(tokenizer.current());
+            tokenizer.moveNext();
+        } else if (tokenizer.current().token() == Token.LEFT_PAREN) {
+            Lexeme leftParen = tokenizer.current();
+            tokenizer.moveNext();
+            ExpressionNode expr = parseExpressionNode();
+
+            if (tokenizer.current().token() != Token.RIGHT_PAREN) {
+                throw new ParserException("Missing parentheses");
+            }
+
+            Lexeme rightParen = tokenizer.current();
+            factorNode = new FactorNode(leftParen, expr, rightParen);
+            tokenizer.moveNext();
+        } else {
+            throw new ParserException("Unexpected token while parsing FactorNode " + tokenizer.current().toString());
+        }
+        return factorNode;
+    }
+
+    private ExpressionNode parseExpressionNode() throws ParserException, IOException, TokenizerException {
+        TermNode term = parseTermNode();
+        Lexeme op = tokenizer.current();
+
+        if (op.token() == Token.ADD_OP || op.token() == Token.SUB_OP) {
+            tokenizer.moveNext();
+            ExpressionNode expr = parseExpressionNode();
+            return new ExpressionNode(term, op, expr);
+        }
+        return new ExpressionNode(term);
+    }
+
+    private TermNode parseTermNode() throws ParserException, IOException, TokenizerException {
+        FactorNode factor = parseFactorNode();
+        Lexeme op = tokenizer.current();
+
+        if (op.token() == Token.DIV_OP || op.token() == Token.MULT_OP) {
+            tokenizer.moveNext();
+            TermNode term = parseTermNode();
+            return new TermNode(factor, op, term);
+        }
+        return new TermNode(factor);
+    }
+
+    private AssignmentNode parseAssignNode() throws ParserException, IOException, TokenizerException {
+        if (tokenizer.current().token() != Token.IDENT) {
+            throw new ParserException("Unexpected token while parsing AssignNode: " + tokenizer.current().toString());
+        }
+
+        Lexeme id = tokenizer.current();
+        tokenizer.moveNext();
+
+        if (tokenizer.current().token() != Token.ASSIGN_OP) {
+            throw new ParserException("Unexpected token while parsing AssignNode: " + tokenizer.current().toString());
+        }
+
+        Lexeme op = tokenizer.current();
+        tokenizer.moveNext();
+        ExpressionNode expr = parseExpressionNode();
+
+        if (tokenizer.current().token() != Token.SEMICOLON) {
+            throw new ParserException("Unexpected token while parsing AssignNode: " + tokenizer.current().toString());
+        }
+
+        Lexeme semiColon = tokenizer.current();
+        tokenizer.moveNext();
+
+        return new AssignmentNode(id, op, expr, semiColon);
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (tokenizer != null) {
+            tokenizer.close();
+        }
+    }
+}
